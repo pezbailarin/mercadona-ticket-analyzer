@@ -154,6 +154,4 @@ python3 stats.py && open informe.html
 
 ---
 
-## Licencia
-
-Uso personal. Sin restricciones.
+![Ejemplo](images/captura.jpeg)
