@@ -9,7 +9,7 @@ except ImportError:
     pass
 
 # Ruta a la base de datos, configurable en .env como DB_PATH
-DB_NAME = str(Path(os.getenv("DB_PATH", "mercadona.db")))
+DB_NAME = str(Path(os.getenv("DB_PATH", "mercadona.db")).expanduser())
 
 
 def obtener_conexion():

@@ -13,7 +13,6 @@ Genera un informe HTML interactivo con:
 
 Uso:
     python3 stats.py                  # genera informe.html
-    python3 stats.py --autocategorize # aplica sugerencias de categoría automáticamente
     python3 stats.py --sin-familia    # lista productos sin familia asignada
 """
 
@@ -30,7 +29,7 @@ try:
 except ImportError:
     pass
 # Directorio de salida del informe HTML (configurable en .env como OUTPUT_DIR)
-_OUTPUT_DIR = _Path(_os.getenv("OUTPUT_DIR", _Path(__file__).parent))
+_OUTPUT_DIR = _Path(_os.getenv("OUTPUT_DIR", _Path(__file__).parent)).expanduser()
 
 CHARTJS_URL   = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"
 CHARTJS_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".chartjs.cache.js")
@@ -76,218 +75,6 @@ def obtener_chartjs():
 #  7 Pasta, arroz y cereales   15  Comidas preparadas
 #  8 Aceites, salsas y cond.
 # ============================================================
-REGLAS_AUTOCATEGORIA = [
-
-    # ----- 15. Comidas preparadas -----
-    # Va primero para que "PIZZA", "ARROZ AL HORNO", "GAZPACHO", etc.
-    # no sean capturados por reglas más genéricas de otras familias.
-    (["BENTO", "SALMOREJO", "GAZPACHO", "TORTILLA PATATA", "POLLO TERIYAKI",
-      "FABADA", "ENSALADILLA", "CALLOS", "COCIDO", "CROQUETA", "PASTA C/POLLO",
-      "ARROZ AL HORNO", "ARROZ HORNO", "LS ARROZ", "LS P PIZZA",
-      "PIZZA FORMAGGI", "PIZZA JAMON", "PIZZA MEDITT", "PIZZA PROSCIUTTO",
-      "PIZZA MARGAR", "PIZZA CUATRO", "PIZZA BARBAR", "PIZZA ATUN",
-      "PIZZA CAMPES", "COULANT", "CARROT CAKE", "OREJA PRECO",
-      "CALAMAR SALSA", "CALAMARES TINTA", "CHILI CON CARNE",
-      "CALDO COCIDO", "CALDO POLLO", "CALDO PESCADO", "CALDO VERDUR",
-      "ALITAS POLLO ASADAS", "SANGRE HERVIDA", "TSATSIKI",
-      "MOUSSE FINAS", "PATÉ", "TRADICIONAL", "ALAS PARTIDAS"], 15),
-
-    # ----- 1. Frutas y verduras -----
-    (["AGUACATE", "AJO", "AJOS", "ALBARICOQUE", "ALCACHOFA", "ALMENDRA",
-      "APIO", "ARÁNDANO", "BANANA", "BATATA", "BREVAS", "BROCOLI", "BROCOLI",
-      "CALABACIN", "CARDO", "CEBOLLA", "CEBOLLINO", "CEBOLLITAS", "CHAMPIÑON",
-      "CIRUELA", "COGOLLOS", "COLIFLOR", "DATIL", "ENDIBIA",
-      "ESPÁRRAGO", "ESPARRAGO", "ESP VERDE", "ESP. CORTO",
-      "ESPINACA", "FRAMBUESA", "FRESÓN", "FRESA ",
-      "HABAS BABY", "HIGO", "JUDÍA", "JUDIA", "KAKI", "KIWI",
-      "LIMON ", "LIMÓN ", "MANDARINA", "MANGO ", "MANZANA",
-      "MAÍZ COCIDO", "MELOCOT", "MELON", "MELÓN",
-      "MIX DE SETAS", "MORA ", "NARANJA", "NECTARINA",
-      "NUEZ NATURAL", "NUEZ TROCEADA", "ANACARDO", "CACAHUETE",
-      "OREJONES", "PARAGUAYO", "PASAS SULTAN", "PASAS ",
-      "PATATA", "PEPINO", "PERA ", "PIMIENTO ROJO", "PIMIENTO TRICO",
-      "PIMIENTO TIRAS", "PIMIENTO FREIR", "PIMIENTO CHORICERO",
-      "PIMIENTO SEMIPI", "PI. CALABAZA", "CASTAÑAS",
-      "PLATANO", "PLÁTANO", "PUERRO", "RABANITOS", "REMOLACHA",
-      "REPOLLO", "ROJA ACIDULCE", "SANDÍA", "SETA", "SALTEADO",
-      "T.CHERRY", "TOMATE CHERRY RAMA", "TOMATE CANARIO", "TOMATE ROSA",
-      "TOMATE ENSALADA", "TOMATE RAMA", "TOMATE PERA TARR",
-      "UVA", "ZANAHORIA", "CANÓNIGOS", "CANONIGOS", "RUCULA",
-      "BERENJENA", "ALBAHACA", "HIERBABUENA", "ROMERO", "TOMILLO",
-      "ORÉGANO", "DUO CANONIGOS", "3 VEGETALES", "CEBOLLINO",
-      "RABANITOS", "MIX DE SETAS", "CHAMPIÑÓN", "ALCACHOFA GRANDE",
-      "PIMIENTA NEGRA GRANO", "FRESA", "LIMON", "MORA", "MANGO",
-      "PAJARITAS VEGETALES", "PIP CALABAZA AGUASAL", "TOMATE PERA"], 1),
-
-    # ----- 2. Carne y charcutería -----
-    (["POLLO", "PECHUGA", "MUSLO", "CONTRAMUSLO", "CUARTO TRASERO",
-      "FILETE", "TERNERA", "CERDO", "CORDERO", "LOMO", "COSTILLA",
-      "COSTILLEJA", "CHULETA", "HAMBURGUESA", "BURGER", "SALCHICHA",
-      "CHORIZO", "JAMON", "JAMÓN", "MORTADELA", "FUET", "BACON",
-      "TACO BACON", "PANCETA", "PAVO ", "CONEJO", "PATO ", "MAGRET",
-      "ENTRECOT", "SOLOMILLO", "SECRETO", "ESCALOPIN ",
-      "CARRILLADA", "LONGANIZA", "STICKS LONGANIZA", "TAQUITOS CHORIZO",
-      "MAXI YORK", "CINTAS DE BACON", "MORCILLA",
-      "ARREGLO PAELLA", "ARREGLO COCIDO", "MINI BURGER", "MAXI HAMBURGUESA",
-      "CABEZA CERDO", "PALETILLA", "ALAS PICANTES",
-      "LS POLLO", "PACK-4 SALCH", "SALCHICHAS", "PECHUGA PAV",
-      "JAMON PAVO", "CERDO TACOS", "CHULETAS MIXTAS",
-      "CH. PALO", "BURGER M VA", "BURGER VACUN",
-      "RULITO CABRA", "MINI BURGER MIXTA"], 2),
-
-    # ----- 3. Pescado y marisco -----
-    (["SALMON", "SALMÓN", "ATÚN", "ATUN ", "MERLUZA", "BACALAO", "BACALADILLA",
-      "DORADA", "LUBINA", "TRUCHA", "SARDINA", "SARDINILLA", "CABALLA",
-      "ANCHOA", "GAMBA", "LANGOSTINO", "MEJILLON", "MEJILLÓN", "BERBERECHO",
-      "CALAMAR", "PULPO", "SEPIA", "GALERA", "PESCADO", "MARISCO",
-      "ESCALOPIN SALM", "RODAJA SALM", "FILETE LUBINA", "FILETE GALLINETA",
-      "FLTE BACALAO", "PORCION MERL", "PATA PULPO", "PATAS DE PULPO",
-      "PULPO COCIDO", "PALITOS SURIMI", "SURIMI",
-      "FTE ANCHOA", "ANCHOA OLIVA", "SARDINAS OLIVA", "SARDINAS ANCHO",
-      "SARDINILLA RE", "MEJ. CHILE", "CALAMARES",
-      "COCKTAIL MEZCLA", "COCKTAIL RODEO", "COCKTAIL CRUNCHY"], 3),
-
-    # ----- 4. Lácteos y huevos -----
-    (["LECHE ENTERA", "LECHE SEMI", "LECHE S/LACT", "LECHE P6",
-      "YOGUR", "YOGURT", "YOG.", "GRIEGO", "QUESO", "MANTEQUILLA",
-      "NATA PARA", "NATA ", "HUEVO", "HUEVOS",
-      "KEFIR", "CUAJADA", "REQUESON", "REQUESÓN", "RICOTTA",
-      "MOZZARELLA", "BRIE", "CAMEMBERT", "NATILLA", "FLAN",
-      "BATIDO", "PETIT ", "LCASEI", "GELLY", "RULITO",
-      "BEBIDA AVENA", "Q RALLADO", "Q BURGOS", "Q SEMI", "Q VIEJO",
-      "Q. AÑEJO", "PERLAS MOZZ", "GRANA PADANO RALLADO",
-      "6 HUEVOS", "12 HUEVOS", "18 HUEVOS",
-      "ARROZ CON LECHE", "COPA CHOCOLATE",
-      "MOZZARELLA FRESCA", "QUESO FRESCO", "QUESO CAMEMBERT",
-      "QUESO SANDWICH", "QUESO LONCHAS OVEJA",
-      "GRIEGO AZUCAR", "MINI RELLENOS DE LEC",
-      "MOUSSE FINAS HIERBAS"], 4),
-
-    # ----- 5. Pan y bollería -----
-    (["PAN DE ESPIGA", "PAN DE PUEBLO", "PAN H BRIOCHE", "PAN HOT DOG",
-      "PAN VIENA", "PAN BLANCO", "PAN ACEITE", "PAN RALLADO",
-      "PAN TOSTADO", "BARRA DE PAN", "BAGUETTE", "BOCADILLO",
-      "PANECILLO", "PANEC.", "PULGUITAS", "ROSQUILLA",
-      "BERLINA CACAO", "MINI BOCADOS", "MONA BAÑADA",
-      "MAGDALENA", "BIZCOCHO", "GALLETA", "CRACKERS", "REGAÑAS",
-      "TORTILLA AVENA", "TORTILLAS MEX", "MASA EMPANADA", "EMPANADA",
-      "ANITINES", "TOSTADITAS", "MINI TOSTAS", "MINI BISCOTTE",
-      "BAGEL", "MINI SALADAS", "PICOS CAMPERO", "PALITOS ACEITUNAS",
-      "TORTITA CAMPESTRE", "HARINA", "IMPULSOR", "MUFFIN CHOCO",
-      "DORAYAKI", "MEDIALUNAS", "GALL DIGESTIVE", "GALL.BAÑADA",
-      "COOKIES CHOCO", "BARRITAS CHIPS", "GALLETA RELIEVE",
-      "PALMERITAS", "MINI RELLENO LECHE", "MINI CARITA CACAO",
-      "30% INTEGRAL", "T. 100%INTEG", "100% INTEGRAL",
-      "MINI BOCADOS", "PAN VIENA REDONDO", "3 BOCADILLOS",
-      "5 BOCADILLOS"], 5),
-
-    # ----- 6. Conservas y legumbres -----
-    (["LENTEJA", "GARBANZO", "ALUBIA", "JUDION",
-      "ATUN CLARO", "FTES ATÚN", "SARDINAS OLIVA",
-      "TOMATE TRITURADO", "TOMATE TROCEADO",
-      "HUMMUS", "ALTRAMUZ", "ACEITUNA SIN HUESO", "ACEITUNA S/HUESO",
-      "A. NEGRAS S/HUESO", "PEPINILLO", "BANDERILLAS",
-      "MEJILLONES ESCABECHE", "PIMIENTO ASADO",
-      "FRITADA", "PISTO", "REMOLACHA EN TIRAS", "TOM.RECETA",
-      "PIPARRA", "ALCAPARRAS", "CHUCRUT", "PICADILLO",
-      "ESPÁRRAGO CORTO", "ESP. CORTO MEDIO", "ESPARRAGO MEDIANO",
-      "SARDINA AHUMADA", "SARDINA OLIVA", "SARDINILLA RE. SAL",
-      "FTE ANCHOA OLIVA", "ANCHOA OLIVA PACK",
-      "TOMATE SECO", "BERBERECHOS"], 6),
-
-    # ----- 7. Pasta, arroz y cereales -----
-    (["SPAGHETTI", "ESPAGUETI", "MACARRON", "TALLARÍN", "LASAÑA",
-      "NOODLES", "FIDEO CABELLO", "PENNE",
-      "ARROZ BOMBA", "ARROZ BASMATI", "ARROZ REDONDO", "COUS COUS",
-      "QUINOA", "AVENA MOLIDA", "MUESLI", "CEREAL RELL",
-      "FRESA ARÁNDANOS AVEN", "CACAO INSTANT",
-      "MAIZ PALOMITAS", "MAÍZ PALOMITAS"], 7),
-
-    # ----- 8. Aceites, salsas y condimentos -----
-    (["ACEITE GIRASOL", "ACEITE OLIVA", "VINAGRE BALSAM", "VINAGRE ",
-      "MAYONESA", "KETCHUP", "MOSTAZA",
-      "SALSA DE SOJA", "SALSA MEXICANA", "TOMATE FRITO",
-      "AZUCAR", "AZÚCAR", "NATA PARA COCINAR", "LECHE DE COCO",
-      "HARINA DE TRIGO", "PAN RALLADO", "IMPULSOR",
-      "PIMIENTO CHORICERO", "ORÉGANO", "PIMIENTA NEGRA",
-      "ALCAPARRAS", "TOMATE SECO", "TOMATE PERA TARRINA"], 8),
-
-    # ----- 9. Snacks y dulces -----
-    (["PAT. CLASS", "PATATAS SERRANO", "PATATA PAJA", "PATATAS ALLIOLI",
-      "PATATAS LISAS", "NACHOS", "PALOMITAS",
-      "CHICLE ORIGINAL", "CHICLE HIERBABUENA", "BOTE CHICLE",
-      "DIVERXUXES", "CUQUIS", "GOLOSINAS MIX", "GOLOSINA FRESI",
-      "BANDERILLAS DULCES", "MINI PEANUT CUPS",
-      "SNACK PIPAS", "PIPA GIGANTE", "SNACK CALABAZA",
-      "COCKTAIL GALL SALADA",
-      "MERMELADA", "MINI BOMBONES", "SURTIDO DULCES", "SURTIDO TURR",
-      "SURTIDO APER", "TARTA ABUELA", "COPA CHOCOLATE",
-      "RED VELVET", "CREMA AVELLANA", "CREMA 100% CACAHUETE",
-      "MINI CONO NATA", "COOKIE DOUGH", "MINI SANDWICH COOKIE",
-      "BOMBITAS DE MAIZ",
-      "LONGANIZA APERIT", "FUET ESPETEC", "TAQUITOS CHOR",
-      "STICKS LONGANIZA", "BARRITA MANGO",
-      "PALITO FRUTOS", "ANACARDO NATURAL", "NUEZ TROCEADA",
-      "CASTAÑAS PELADAS",
-      "ARROZ CON LECHE", "NATILLA C/GALLETA", "PETIT SABORES",
-      "DORAYAKI HACEND", "MINI RELLENO LECHE", "MINI CARITA CACAO",
-      "MUFFIN CHOCO", "BERLINA CACAO", "MEDIALUNAS",
-      "GALL.BAÑADA CHOCOBLA", "GALL DIGESTIVE CHOCO",
-      "COOKIES CHOCO", "BARRITAS CHIPS", "GALLETA RELIEVE",
-      "PALMERITAS", "MINI BOCADOS", "PATÉ SUAVE",
-      "GARFITOS", "TORTITAS ARROZ"], 9),
-
-    # ----- 10. Bebidas -----
-    (["AGUA MINERAL", "AGUA DESTILADA", "AGUA FUERTE",
-      "AGUA MINERAL PACK", "AGUA MINERAL 1L", "AGUA SIN GAS",
-      "BRONCHALES", "ZUMO", "REFRESCO", "GASEOSA",
-      "CERVEZA", "CERV ", "C 0,0 TOSTADA", "CERVEZA TOSTADA",
-      "CERV TOSTADA", "CERV PACK",
-      "VINO RIOJA", "RIOJA CRIANZA", "CAMPO BORJA", "FINO MORILES",
-      "CAFÉ GRANO", "CAP. EXTRAFORTE", "GRANO EXTRA",
-      "ICE TEA", "ISOTÓNICO", "ISOTÓNICA", "ISO LIMÓN",
-      "LIMON EXPRIMIDO", "PACK 4X500 COLA", "BEBIDA AVENA",
-      "COCA COLA", "COLA ZERO", "CORTES GAS", "HORCHATA",
-      "CACAO INSTANT", "BEBER FRESA", "LECHE DE AVENA",
-      "ZUMO DE PIÑA", "ZUMO MANZANA", "ZUMO PIÑA REFRIG"], 10),
-
-    # ----- 11. Congelados -----
-    (["GUISANTES MUY TIERNO", "HABITAS MUY TIERNAS", "HIELO CUBITO",
-      "HELADO BROWNIE", "MINI SANDWICH COOKIE", "COOKIE DOUGH",
-      "FIGURITAS MERLUZA", "HELADO FRESA", "HELADO LIMA",
-      "HELADO MOCHI", "MINI CONO NATA",
-      "PALOMITAS SAL PACK", "MINI 6"], 11),
-
-    # ----- 12. Droguería y limpieza -----
-    (["DETERGENTE", "SUAVIZANTE", "LAVAVAJILL", "FRIEGASUELOS",
-      "BAYETA", "ESTROPAJO", "ROLLO HOGAR", "PAPEL ALUMINIO",
-      "PAPEL VEGETAL", "FILM TRANSP",
-      "BOLSA BASURA", "BOLSA PLASTICO", "CÁPSULA ROPA", "CAPSULA ROPA",
-      "GEL WC", "LIMPIADOR", "LEJIA", "LEJÍA", "AMONIACO",
-      "LIMPIAHORNOS", "QUITAGRASA", "LIMPIAMAQUINAS",
-      "CRISTALES MULTIUSOS", "TOALLITAS ANTIT",
-      "VARITAS DIF", "RECAMBIO LIQUIDO",
-      "COMP.NORMAL C/A", "COMP.NOCHE C/A", "COM.NORMAL C/A",
-      "FOSFOROS", "32 PASTILLAS ENCENDI",
-      "40 B.CIERRA", "SAL LAVAVAJILLAS",
-      "CEPILLO LAVAR", "GUANTE RESIS", "DISCOS DESM",
-      "LIMPIADOR DESINFECT", "PLATO GRANDE"], 12),
-
-    # ----- 13. Higiene y cuidado personal -----
-    (["CHAMPU", "CHAMPÚ", "GEL DERMO", "GEL DUCHA", "JABÓN", "JABON",
-      "DESODORANTE", "DEO ROLL", "CREMA HIDRAT",
-      "PASTA DENTAL", "COLGATE", "CEPILLO DENT", "MAQUINILLA",
-      "COMPRESAS", "TAMPÓN", "COLONIA", "HIDRATANTE", "PROTECTOR",
-      "HIGIENICO DOBLE", "PAPEL HIGIÉNICO", "PAPEL HIGIENICO",
-      "ARCOS DENTALES", "2 EN 1 WHITE",
-      "STICK ANTIROZADURAS", "DEO ROLL-ON INV",
-      "TOALL. DESODOR", "DISCOS DESM REDONDO"], 13),
-
-    # ----- 14. Otras -----
-    (["BASE PIZZA FAMILIAR", "CARBÓN VEGETAL", "PARKING",
-      "FOSFOROS MADERA"], 14),
-]
-
 
 def validar_totales():
     """
@@ -330,61 +117,6 @@ def productos_sin_familia():
               for r in cursor.fetchall()]
     conn.close()
     return result
-
-
-def sugerir_categorias():
-    """
-    Aplica las reglas de auto-categorización a los productos sin familia.
-    Devuelve lista de dicts con sugerencias (sin modificar la BD).
-    """
-    sin_familia = productos_sin_familia()
-    sugerencias = []
-
-    conn = obtener_conexion()
-    cursor = conn.cursor()
-
-    for producto in sin_familia:
-        desc = producto["descripcion"].upper()
-        for palabras_clave, familia_id in REGLAS_AUTOCATEGORIA:
-            if any(kw.upper() in desc for kw in palabras_clave):
-                cursor.execute("SELECT Descripcion FROM Familias WHERE Fam_id = ?", (familia_id,))
-                row = cursor.fetchone()
-                if row:
-                    sugerencias.append({
-                        "producto_id":    producto["id"],
-                        "descripcion":    producto["descripcion"],
-                        "familia_id":     familia_id,
-                        "familia_nombre": row[0]
-                    })
-                break  # primera regla que encaja
-
-    conn.close()
-    return sugerencias
-
-
-def aplicar_autocategorizacion():
-    """
-    Aplica las sugerencias de auto-categorización directamente en la BD.
-    Solo actúa sobre productos que aún no tienen familia asignada.
-    """
-    sugerencias = sugerir_categorias()
-    if not sugerencias:
-        print("ℹ️  No hay productos sin familia que encajen con las reglas.")
-        return
-
-    conn = obtener_conexion()
-    cursor = conn.cursor()
-
-    for s in sugerencias:
-        cursor.execute(
-            "UPDATE productos SET familia_id = ? WHERE id = ? AND familia_id IS NULL",
-            (s["familia_id"], s["producto_id"])
-        )
-        print(f"  ✅ {s['descripcion']:<40} → {s['familia_nombre']}")
-
-    conn.commit()
-    conn.close()
-    print(f"\n{len(sugerencias)} productos categorizados automáticamente.")
 
 
 def obtener_estadisticas():
@@ -700,6 +432,8 @@ def cargar_datos_completos():
 
 def generar_html(stats):
     """Genera el informe HTML interactivo con filtros de fecha en el navegador."""
+    from datetime import datetime as _dt
+    fecha_generacion = _dt.now().strftime("%d/%m/%Y %H:%M")
 
     r = stats["resumen"]
 
@@ -726,9 +460,9 @@ def generar_html(stats):
         )
         sin_fam_html = f"""
         <div class="alert alert-info">
-            ℹ️ <strong>{len(stats['sin_familia'])} producto(s) sin familia asignada:</strong>
+            ℹ️ <strong>{len(stats['sin_familia'])} producto(s) sin familia asignada.</strong>
+            Ejecuta el script <code>categorizar.py</code> para asignarles una categoría.
             <ul>{items}</ul>
-            <small>Ejecuta <code>python3 stats.py --autocategorize</code> o <code>python3 categorizar.py</code>.</small>
         </div>"""
 
 
@@ -1164,7 +898,7 @@ def generar_html(stats):
 
   {alertas_precio_html}
 
-  <footer>Generado por <strong>Mercadona Ticket Analyzer</strong> · base de datos: <code>{DB_NAME}</code></footer>
+  <footer>Generado por <a href="https://github.com/pezbailarin/mercadona-ticket-analyzer" target="_blank"><strong>Mercadona Ticket Analyzer</strong></a> · {fecha_generacion} · base de datos: <code>{DB_NAME}</code></footer>
 </div>
 
 <script>
@@ -1188,7 +922,7 @@ document.addEventListener("DOMContentLoaded", function init() {{
     DATOS.tarjetas.forEach(tar => {{
       const btn = document.createElement('button');
       btn.className = 'btn-tarjeta';
-      btn.textContent = tar.label;
+      btn.textContent = '💳 ' + tar.label;
       btn.dataset.tarjetaId = tar.id;
       btn.addEventListener('click', () => {{
         filtroTarjeta = (filtroTarjeta === tar.id) ? "" : tar.id;
@@ -1811,12 +1545,9 @@ Ejemplos:
   python3 stats.py                        Genera informe.html
   python3 stats.py --output enero.html    Nombre de salida personalizado
   python3 stats.py --sin-familia          Lista productos sin categoría y sale
-  python3 stats.py --autocategorize       Aplica auto-categorización y sale
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--autocategorize", action="store_true",
-                        help="Aplica auto-categorización a productos sin familia y sale")
     parser.add_argument("--sin-familia", action="store_true",
                         help="Lista productos sin familia asignada y sale")
     parser.add_argument("--csv", metavar="CARPETA",
@@ -1837,11 +1568,6 @@ Ejemplos:
             print(f"⚠️  {len(productos)} productos sin familia:\n")
             for p in productos:
                 print(f"  [{p['id']:>4}] {p['descripcion']:<40} {p['gasto_total']:>7.2f} €")
-        return
-
-    if args.autocategorize:
-        print("🔍 Aplicando auto-categorización...\n")
-        aplicar_autocategorizacion()
         return
 
     print("📊 Calculando estadísticas...")

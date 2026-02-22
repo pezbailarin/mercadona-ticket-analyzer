@@ -23,9 +23,9 @@ except ImportError:
 
 # Carpetas configurables en .env
 _DIR_BASE     = Path(__file__).parent
-SAVE_DIR      = Path(os.getenv("SAVE_DIR", ""))          # carpeta de entrada (retrieve.py)
-PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", _DIR_BASE / "tickets_procesados"))
-ERROR_DIR     = Path(os.getenv("ERROR_DIR",     _DIR_BASE / "tickets_error"))
+SAVE_DIR      = Path(os.getenv("SAVE_DIR", "")).expanduser()          # carpeta de entrada (retrieve.py)
+PROCESSED_DIR = Path(os.getenv("PROCESSED_DIR", _DIR_BASE / "tickets_procesados")).expanduser()
+ERROR_DIR     = Path(os.getenv("ERROR_DIR",     _DIR_BASE / "tickets_error")).expanduser()
 
 
 def obtener_o_crear_tarjeta(ultimos4):

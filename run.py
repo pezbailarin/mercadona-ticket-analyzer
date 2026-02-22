@@ -25,7 +25,7 @@ except ImportError:
     pass
 
 # ── Configuración de log ─────────────────────────────────────────
-LOG_DIR  = Path(os.getenv("LOG_DIR", Path(__file__).parent / "logs"))
+LOG_DIR  = Path(os.getenv("LOG_DIR", Path(__file__).parent / "logs")).expanduser()
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 log_file = LOG_DIR / f"run_{datetime.now().strftime('%Y%m%d')}.log"
 
@@ -57,7 +57,7 @@ def paso_backup():
         log.info("-- backup: BD no existe todavia, se omite")
         return
 
-    backup_dir = Path(os.getenv("BACKUP_DIR", Path(__file__).parent / "backups"))
+    backup_dir = Path(os.getenv("BACKUP_DIR", Path(__file__).parent / "backups")).expanduser()
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     nombre = f"mercadona_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
@@ -131,7 +131,7 @@ def paso_stats():
         from pathlib import Path as _Path
         import os as _os
 
-        output_dir = _Path(_os.getenv("OUTPUT_DIR", _Path(__file__).parent))
+        output_dir = _Path(_os.getenv("OUTPUT_DIR", _Path(__file__).parent)).expanduser()
         output     = str(output_dir / "informe.html")
 
         estadisticas = _stats.obtener_estadisticas()
