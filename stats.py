@@ -352,6 +352,183 @@ def obtener_estadisticas():
     return stats
 
 
+
+def obtener_records():
+    """Calcula los récords y curiosidades para el informe."""
+    conn = obtener_conexion()
+    cur = conn.cursor()
+    rec = {}
+
+    # Día de locura
+    cur.execute("""
+        SELECT DATE(datetime) as dia, COUNT(*) as n,
+               GROUP_CONCAT(numero_ticket, ', ') as tickets
+        FROM tickets GROUP BY dia ORDER BY n DESC, dia DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["dia_locura"] = {"dia": r[0], "n": r[1], "tickets": r[2]}
+
+    # Ticket más caro
+    cur.execute("SELECT numero_ticket, datetime, total FROM tickets ORDER BY total DESC LIMIT 1")
+    r = cur.fetchone()
+    if r:
+        rec["ticket_caro"] = {"numero": r[0], "fecha": r[1][:10], "total": r[2]}
+
+    # Ermitaño: mayor tiempo entre compras
+    cur.execute("""
+        SELECT a.datetime, b.datetime,
+               CAST((JULIANDAY(b.datetime) - JULIANDAY(a.datetime)) AS INTEGER) as dias
+        FROM tickets a JOIN tickets b ON b.id = (
+            SELECT id FROM tickets WHERE datetime > a.datetime ORDER BY datetime LIMIT 1
+        )
+        ORDER BY dias DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["ermitano"] = {"desde": r[0][:10], "hasta": r[1][:10], "dias": r[2]}
+
+    # Despistado: menor tiempo entre tickets del mismo día
+    cur.execute("""
+        SELECT a.datetime, b.datetime,
+               ROUND((JULIANDAY(b.datetime) - JULIANDAY(a.datetime)) * 24 * 60, 0) as minutos
+        FROM tickets a JOIN tickets b
+          ON DATE(a.datetime) = DATE(b.datetime) AND b.datetime > a.datetime
+        ORDER BY minutos ASC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["despistado"] = {"t1": r[0][11:16], "t2": r[1][11:16],
+                             "dia": r[0][:10], "minutos": int(r[2])}
+
+    # La joya: item más caro
+    cur.execute("""
+        SELECT p.descripcion, l.precio_unitario, l.es_peso, t.datetime, t.numero_ticket
+        FROM lineas_ticket l
+        JOIN productos p ON l.producto_id = p.id
+        JOIN tickets t ON l.ticket_id = t.id
+        ORDER BY l.precio_unitario DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        unidad = "€/kg" if r[2] else "€"
+        rec["joya"] = {"desc": r[0], "precio": r[1], "unidad": unidad,
+                       "fecha": r[3][:10], "numero": r[4]}
+
+    # Monocromático: ticket más caro con todos los productos de una sola familia
+    cur.execute("""
+        SELECT t.numero_ticket, t.datetime, t.total,
+               f.Descripcion, f.Emoji,
+               COUNT(DISTINCT p.familia_id) as nf
+        FROM tickets t
+        JOIN lineas_ticket l ON l.ticket_id = t.id
+        JOIN productos p ON l.producto_id = p.id
+        LEFT JOIN Familias f ON p.familia_id = f.Fam_id
+        WHERE p.familia_id IS NOT NULL
+        GROUP BY t.id HAVING nf = 1
+        ORDER BY t.total DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["monocromatico"] = {"numero": r[0], "fecha": r[1][:10],
+                                "total": r[2], "familia": r[3], "emoji": r[4]}
+
+    # Logística: ticket con más productos distintos
+    cur.execute("""
+        SELECT t.numero_ticket, t.datetime, COUNT(DISTINCT l.producto_id) as n
+        FROM tickets t JOIN lineas_ticket l ON l.ticket_id = t.id
+        GROUP BY t.id ORDER BY n DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["logistica"] = {"numero": r[0], "fecha": r[1][:10], "n": r[2]}
+
+    # Por los pelos: ticket a la hora más tarde
+    cur.execute("SELECT numero_ticket, datetime, TIME(datetime) FROM tickets ORDER BY TIME(datetime) DESC LIMIT 1")
+    r = cur.fetchone()
+    if r:
+        rec["por_los_pelos"] = {"numero": r[0], "fecha": r[1][:10], "hora": r[2][:5]}
+
+    # Madrugador: ticket más temprano
+    cur.execute("SELECT numero_ticket, datetime, TIME(datetime) FROM tickets ORDER BY TIME(datetime) ASC LIMIT 1")
+    r = cur.fetchone()
+    if r:
+        rec["madrugador"] = {"numero": r[0], "fecha": r[1][:10], "hora": r[2][:5]}
+
+    # Acaparador: más unidades del mismo artículo en un ticket (solo unidades, no peso)
+    cur.execute("""
+        SELECT t.numero_ticket, t.datetime, p.descripcion, ROUND(l.cantidad, 0) as cant
+        FROM lineas_ticket l
+        JOIN tickets t ON l.ticket_id = t.id
+        JOIN productos p ON l.producto_id = p.id
+        WHERE l.es_peso = 0
+        ORDER BY l.cantidad DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["acaparador"] = {"numero": r[0], "fecha": r[1][:10],
+                             "desc": r[2], "cant": int(r[3])}
+
+    # Explorador: ticket con más categorías distintas
+    cur.execute("""
+        SELECT t.numero_ticket, t.datetime, COUNT(DISTINCT p.familia_id) as n
+        FROM tickets t
+        JOIN lineas_ticket l ON l.ticket_id = t.id
+        JOIN productos p ON l.producto_id = p.id
+        WHERE p.familia_id IS NOT NULL
+        GROUP BY t.id ORDER BY n DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["explorador"] = {"numero": r[0], "fecha": r[1][:10], "n": r[2]}
+
+    # Siempre fiel: producto comprado en más tickets distintos
+    cur.execute("""
+        SELECT p.descripcion, COUNT(DISTINCT l.ticket_id) as n
+        FROM lineas_ticket l JOIN productos p ON l.producto_id = p.id
+        GROUP BY p.id ORDER BY n DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["siempre_fiel"] = {"desc": r[0], "n": r[1]}
+
+    # Día del juicio: fecha con más artículos de Droguería (fam_id=12)
+    cur.execute("""
+        SELECT DATE(t.datetime) as dia,
+               CAST(SUM(CASE WHEN l.es_peso = 0 THEN l.cantidad ELSE 1 END) AS INTEGER) as u
+        FROM lineas_ticket l
+        JOIN tickets t ON l.ticket_id = t.id
+        JOIN productos p ON l.producto_id = p.id
+        WHERE p.familia_id = 12
+        GROUP BY dia ORDER BY u DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["juicio_final"] = {"dia": r[0], "unidades": r[1]}
+
+    # Minimalista: ticket con menos líneas (al menos 2)
+    cur.execute("""
+        SELECT t.numero_ticket, t.datetime, COUNT(l.id) as n
+        FROM tickets t JOIN lineas_ticket l ON l.ticket_id = t.id
+        GROUP BY t.id HAVING n >= 2
+        ORDER BY n ASC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["minimalista"] = {"numero": r[0], "fecha": r[1][:10], "n": r[2]}
+
+    # Mi segunda casa: tienda con más gasto
+    cur.execute("""
+        SELECT tienda, ROUND(SUM(total), 2) as gasto, COUNT(*) as visitas
+        FROM tickets GROUP BY tienda ORDER BY gasto DESC LIMIT 1
+    """)
+    r = cur.fetchone()
+    if r:
+        rec["segunda_casa"] = {"tienda": r[0], "gasto": r[1], "visitas": r[2]}
+
+    conn.close()
+    return rec
+
 def cargar_datos_completos():
     """
     Carga todos los tickets y líneas de la BD en una estructura JSON-serializable
@@ -435,6 +612,8 @@ def generar_html(stats):
     from datetime import datetime as _dt
     fecha_generacion = _dt.now().strftime("%d/%m/%Y %H:%M")
 
+    records = obtener_records()
+
     r = stats["resumen"]
 
     alertas_html = ""
@@ -461,9 +640,118 @@ def generar_html(stats):
         sin_fam_html = f"""
         <div class="alert alert-info">
             ℹ️ <strong>{len(stats['sin_familia'])} producto(s) sin familia asignada.</strong>
-            Ejecuta el script <code>categorizar.py</code> para asignarles una categoría.
+            Ejecuta <code>python3 categorizar.py</code> para asignarles una categoría.
             <ul>{items}</ul>
         </div>"""
+
+
+
+    # ── HTML de récords ──────────────────────────────────────────
+    def _rec_card(emoji, titulo, valor, detalle):
+        return f"""
+        <div class="record-card">
+          <div class="rec-header">{emoji} {titulo}</div>
+          <div class="rec-value">{valor}</div>
+          <div class="rec-detail">{detalle}</div>
+        </div>"""
+
+    rec = records
+    rec_cards = ""
+
+    if rec.get("dia_locura"):
+        rd = rec["dia_locura"]
+        n_txt = f"{rd['n']} ticket{'s' if rd['n'] > 1 else ''}"
+        rec_cards += _rec_card("📅", "Día de locura", n_txt,
+            f"El {rd['dia']} se hicieron {rd['n']} compras distintas.")
+
+    if rec.get("ticket_caro"):
+        rd = rec["ticket_caro"]
+        rec_cards += _rec_card("💰", "Ticket más caro", f"{rd['total']:.2f} €",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("ermitano"):
+        rd = rec["ermitano"]
+        rec_cards += _rec_card("⌛", "Ermitaño", f"{rd['dias']} días sin comprar",
+            f"Entre el {rd['desde']} y el {rd['hasta']}")
+
+    if rec.get("despistado"):
+        rd = rec["despistado"]
+        rec_cards += _rec_card("⚡", "Despistado", f"{rd['minutos']} min entre compras",
+            f"El {rd['dia']}: una a las {rd['t1']} y otra a las {rd['t2']}")
+
+    if rec.get("joya"):
+        rd = rec["joya"]
+        rec_cards += _rec_card("💎", "La joya de la corona",
+            f"{rd['precio']:.2f} {rd['unidad']}",
+            f"{rd['desc']} · {rd['fecha']}")
+
+    if rec.get("monocromatico"):
+        rd = rec["monocromatico"]
+        rec_cards += _rec_card("🎨", "Monocromático",
+            f"{rd['emoji']} {rd['familia']} · {rd['total']:.2f} €",
+            f"Ticket {rd['numero']} · {rd['fecha']} · todo de una sola categoría")
+
+    if rec.get("logistica"):
+        rd = rec["logistica"]
+        rec_cards += _rec_card("🏗️", "Logística Nivel Pro",
+            f"{rd['n']} productos distintos",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("por_los_pelos"):
+        rd = rec["por_los_pelos"]
+        rec_cards += _rec_card("🕒", "Por los pelos",
+            f"A las {rd['hora']}",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("madrugador"):
+        rd = rec["madrugador"]
+        rec_cards += _rec_card("🌅", "Madrugador",
+            f"A las {rd['hora']}",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("acaparador"):
+        rd = rec["acaparador"]
+        rec_cards += _rec_card("🧻", "Acaparador",
+            f"{rd['cant']} × {rd['desc']}",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("explorador"):
+        rd = rec["explorador"]
+        rec_cards += _rec_card("🧭", "Explorador",
+            f"{rd['n']} categorías distintas",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("siempre_fiel"):
+        rd = rec["siempre_fiel"]
+        rec_cards += _rec_card("🔁", "Siempre fiel",
+            rd['desc'],
+            f"Comprado en {rd['n']} tickets distintos")
+
+    if rec.get("juicio_final"):
+        rd = rec["juicio_final"]
+        rec_cards += _rec_card("🧹", "Día del juicio final",
+            f"{rd['unidades']} artículos de limpieza",
+            f"El {rd['dia']}")
+
+    if rec.get("minimalista"):
+        rd = rec["minimalista"]
+        rec_cards += _rec_card("🧮", "Minimalista",
+            f"Solo {rd['n']} líneas",
+            f"Ticket {rd['numero']} · {rd['fecha']}")
+
+    if rec.get("segunda_casa"):
+        rd = rec["segunda_casa"]
+        rec_cards += _rec_card("🏠", "Mi segunda casa",
+            rd['tienda'],
+            f"{rd['gasto']:.2f} € en {rd['visitas']} visitas")
+
+    records_section_html = f"""
+  <div class="section">
+    <h2>🏆 Récords</h2>
+    <div class="records-grid">
+      {rec_cards}
+    </div>
+  </div>"""
 
 
     # Alertas de subida de precio
@@ -573,7 +861,7 @@ def generar_html(stats):
   .btn-mes.activo {{ background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 600; }}
   .btn-mes.vacio {{ opacity: 0.25; cursor: default; pointer-events: none; }}
   /* Botones de tarjeta */
-  .tarjetas-row {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }}
+  .tarjetas-row {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; position: relative; }}
   .btn-tarjeta {{
     background: transparent; border: 1px solid var(--border); color: var(--muted);
     border-radius: 7px; padding: 0.25rem 0.8rem; font-family: inherit;
@@ -584,9 +872,14 @@ def generar_html(stats):
   .btn-reset {{
     background: transparent; border: 1px solid var(--border); color: var(--muted);
     border-radius: 7px; padding: 0.3rem 0.9rem; font-family: inherit;
-    font-size: 0.8rem; cursor: pointer; transition: all 0.15s;
+    font-size: 0.8rem; cursor: pointer; transition: all 0.15s; display: none;
   }}
   .btn-reset:hover {{ border-color: var(--danger); color: var(--danger); }}
+  #filtro-tarjeta-activa {{
+    position: absolute; top: 0; right: 0;
+    color: var(--accent2); font-size: 0.78rem;
+    display: none;
+  }}
   #filtro-activo {{
     font-size: 0.78rem; color: var(--accent); margin-left: auto;
     align-self: center; display: none;
@@ -642,6 +935,52 @@ def generar_html(stats):
   .alert small {{ display: block; margin-top: 0.5rem; color: var(--muted); }}
   .alert-info {{ background: rgba(56,189,248,0.08); border-color: rgba(56,189,248,0.3); }}
   code {{ background: var(--border); border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.85em; }}
+
+  /* ── Récords ── */
+  .records-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }}
+  .record-card {{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    cursor: default;
+    transition: border-color 0.15s, transform 0.15s;
+    position: relative;
+  }}
+  .record-card:hover {{
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }}
+  .record-card .rec-header {{
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.78rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 0.35rem;
+  }}
+  .record-card .rec-value {{
+    font-size: 1.05rem; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }}
+  .record-card .rec-detail {{
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px); left: 0; right: 0;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    z-index: 10;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    line-height: 1.5;
+  }}
+  .record-card:hover .rec-detail {{ display: block; }}
 
   footer {{ text-align: center; color: var(--muted); font-size: 0.78rem;
             margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }}
@@ -748,7 +1087,7 @@ def generar_html(stats):
 
   <!-- Filtros -->
   <div class="filtros">
-    <div class="tarjetas-row" id="tarjetas-row"></div>
+    <div class="tarjetas-row" id="tarjetas-row"><span id="filtro-tarjeta-activa"></span></div>
     <div class="años-row" id="años-row"></div>
     <div class="meses-row" id="meses-row"></div>
     <div class="filtros-row">
@@ -760,7 +1099,7 @@ def generar_html(stats):
         <label>Hasta</label>
         <input type="date" id="fecha-hasta">
       </div>
-      <button class="btn-reset" onclick="resetFiltros()">✕ Quitar filtros</button>
+      <button class="btn-reset" id="btn-reset" onclick="resetFiltros()">✕ Quitar filtros</button>
       <span id="filtro-activo"></span>
     </div>
   </div>
@@ -896,6 +1235,8 @@ def generar_html(stats):
     <div id="precio-vacio" class="precio-vacio">Busca un producto para ver su evolución de precio</div>
   </div>
 
+  {records_section_html}
+
   {alertas_precio_html}
 
   <footer>Generado por <a href="https://github.com/pezbailarin/mercadona-ticket-analyzer" target="_blank"><strong>Mercadona Ticket Analyzer</strong></a> · {fecha_generacion} · base de datos: <code>{DB_NAME}</code></footer>
@@ -1023,6 +1364,15 @@ function renderMeses() {{
   }});
 }}
 
+function hayFiltroActivo() {{
+  return filtroAño || filtroMes || filtroDesde || filtroHasta || filtroTarjeta;
+}}
+
+function actualizarBtnReset() {{
+  const btn = document.getElementById('btn-reset');
+  if (btn) btn.style.display = hayFiltroActivo() ? 'inline-block' : 'none';
+}}
+
 function resetFiltros() {{
   filtroAño = filtroMes = filtroDesde = filtroHasta = filtroTarjeta = "";
   document.getElementById('fecha-desde').value = "";
@@ -1030,6 +1380,7 @@ function resetFiltros() {{
   document.querySelectorAll('.btn-año, .btn-mes, .btn-tarjeta').forEach(b => b.classList.remove('activo'));
   document.getElementById('meses-row').innerHTML = '';
   actualizar();
+  actualizarBtnReset();
 }}
 
 // ── Filtrado ─────────────────────────────────────────────────────
@@ -1055,6 +1406,7 @@ function actualizar() {{
   const lineas  = DATOS.lineas.filter(l => tids.has(l.tid));
 
   actualizarFiltroActivo(tickets);
+  actualizarBtnReset();
   actualizarKPIs(tickets, lineas);
   actualizarGraficoMes(tickets);
   actualizarGraficoFamilia(lineas);
@@ -1066,12 +1418,26 @@ function actualizar() {{
 
 function actualizarFiltroActivo(tickets) {{
   const el = document.getElementById('filtro-activo');
-  const hayFiltro = filtroMes || filtroDesde || filtroHasta;
-  if (!hayFiltro) {{ el.style.display = 'none'; return; }}
+  const elTar = document.getElementById('filtro-tarjeta-activa');
+  // Texto de tarjeta
+  if (filtroTarjeta) {{
+    const tar = DATOS.tarjetas.find(t => t.id === filtroTarjeta);
+    const tarLabel = tar ? (tar.label !== '····' + tar.ultimos4 ? '"' + tar.label + '"' : tar.ultimos4) : filtroTarjeta;
+    elTar.style.display = 'block';
+    elTar.textContent = '💳 compras realizadas con ' + (tar && tar.label !== '····' + tar.ultimos4 ? tarLabel : 'la tarjeta terminada en ' + tarLabel);
+  }} else {{
+    elTar.style.display = 'none';
+    elTar.textContent = '';
+  }}
+  // Texto de fecha/año/mes
+  const hayFecha = filtroMes || filtroAño || filtroDesde || filtroHasta;
+  if (!hayFecha) {{ el.style.display = 'none'; el.textContent = ''; return; }}
   el.style.display = 'inline';
   if (filtroMes) {{
     const [y, m] = filtroMes.split('-');
     el.textContent = '📅 ' + new Date(y, m-1).toLocaleDateString('es-ES', {{month:'long', year:'numeric'}});
+  }} else if (filtroAño) {{
+    el.textContent = '📅 año ' + filtroAño;
   }} else {{
     el.textContent = '📅 ' + (filtroDesde || '…') + ' → ' + (filtroHasta || '…');
   }}

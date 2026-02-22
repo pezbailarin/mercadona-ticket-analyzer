@@ -68,11 +68,10 @@ Se recomiendan rutas absolutas para evitar ambigüedad, especialmente al ejecuta
 
 ```bash
 python3 retrieve.py            # Solo busca en emails enviados por mercadona
-python3 retrieve.py 30         # Enviados por mercadona en los últimos 30 días
-python3 retrieve.py 7          # Enviados por mercadona en los últimos 7 días
+python3 retrieve.py 30         # Busca en todos los emails de los últimos 30 días
+python3 retrieve.py 7          # Busca en todos los emails de  los últimos 7 días
 python3 retrieve.py --todos    # toda la bandeja sin filtro de remitente (puede tardar)
 python3 retrieve.py --todos 7  # toda la bandeja, últimos 7 días
-python3 retrieve.py --carpetas # lista las carpetas IMAP disponibles
 ```
 
 Si otra persona te reenvía tickets de Mercadona, usa `--dias N` o `--todos --dias N` para capturarlos.
@@ -110,9 +109,9 @@ python3 manual.py --borrar   # buscar y borrar un ticket por nº de factura
 ```bash
 python3 categorizar.py               # categorizar productos sin familia; si no hay, abre el buscador
 python3 categorizar.py --lista       # ver todos los productos agrupados por familia
-python3 categorizar.py --buscar      # buscar y editar cualquier producto directamente
-python3 categorizar.py --tarjetas    # gestionar etiquetas de tarjetas de pago
-python3 categorizar.py --auto        # aplicar auto-categorización a productos sin familia
+python3 categorizar.py --buscar      # buscar y editar cualquier producto directamente.
+python3 categorizar.py --tarjetas    # gestionar etiquetas de tarjetas de pago.
+python3 categorizar.py --auto        # auto-asigna categorías a los productos sin ella.
 ```
 
 ---
@@ -162,7 +161,6 @@ python3 stats.py && open informe.html
 | `manual.py` | Introducción y borrado manual de tickets |
 | `retrieve.py` | Descarga PDFs desde Gmail |
 | `run.py` | Orquestador: retrieve → main → stats |
-| `imap_folders.py` | Lista las carpetas IMAP disponibles en Gmail |
 | `mercadona.db` | Base de datos (se crea automáticamente) |
 | `tickets_procesados/` | PDFs ya importados (se crea automáticamente) |
 

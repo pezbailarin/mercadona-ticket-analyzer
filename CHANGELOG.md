@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.0.5] — 2026-02-22
+
+### Añadido
+- `stats.py`: Añadida sección con "records" en las compras. Cambios relacionados con los filtros.
 
 ## [1.0.3] — 2026-02-22
 
