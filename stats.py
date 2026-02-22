@@ -676,7 +676,7 @@ def generar_html(stats):
 
     if rec.get("despistado"):
         rd = rec["despistado"]
-        rec_cards += _rec_card("⚡", "Despistado", f"{rd['minutos']} min entre compras",
+        rec_cards += _rec_card("⚡", "Despistado", f"Solo {rd['minutos']} min entre compras",
             f"El {rd['dia']}: una a las {rd['t1']} y otra a las {rd['t2']}")
 
     if rec.get("joya"):
@@ -861,7 +861,7 @@ def generar_html(stats):
   .btn-mes.activo {{ background: var(--accent); border-color: var(--accent); color: #0f1117; font-weight: 600; }}
   .btn-mes.vacio {{ opacity: 0.25; cursor: default; pointer-events: none; }}
   /* Botones de tarjeta */
-  .tarjetas-row {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; position: relative; }}
+  .tarjetas-row {{ display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.25rem; }}
   .btn-tarjeta {{
     background: transparent; border: 1px solid var(--border); color: var(--muted);
     border-radius: 7px; padding: 0.25rem 0.8rem; font-family: inherit;
@@ -876,9 +876,9 @@ def generar_html(stats):
   }}
   .btn-reset:hover {{ border-color: var(--danger); color: var(--danger); }}
   #filtro-tarjeta-activa {{
-    position: absolute; top: 0; right: 0;
+    display: none; text-align: right;
     color: var(--accent2); font-size: 0.78rem;
-    display: none;
+    margin-bottom: 0.25rem;
   }}
   #filtro-activo {{
     font-size: 0.78rem; color: var(--accent); margin-left: auto;
@@ -1087,7 +1087,8 @@ def generar_html(stats):
 
   <!-- Filtros -->
   <div class="filtros">
-    <div class="tarjetas-row" id="tarjetas-row"><span id="filtro-tarjeta-activa"></span></div>
+    <div class="tarjetas-row" id="tarjetas-row"></div>
+    <div id="filtro-tarjeta-activa"></div>
     <div class="años-row" id="años-row"></div>
     <div class="meses-row" id="meses-row"></div>
     <div class="filtros-row">
@@ -1175,7 +1176,7 @@ def generar_html(stats):
 
   <!-- Top productos -->
   <div class="section">
-    <h2>🏆 Productos más comprados</h2>
+    <h2>🔥 Productos más comprados</h2>
     <table>
       <thead><tr>
         <th>Producto</th>
