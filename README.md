@@ -21,7 +21,7 @@ No se necesitan más dependencias externas. El informe HTML funciona directament
 ## Instalación
 
 ```bash
-git clone <url-del-repo>
+git clone https://github.com/pezbailarin/mercadona-ticket-analyzer
 cd mercadona-ticket-analyzer
 python -m venv venv
 source venv/bin/activate        # bash / zsh
@@ -96,6 +96,8 @@ python3 stats.py --csv ./exportacion/    # exporta datos a CSV y sale
 Abre el HTML resultante en cualquier navegador. No requiere conexión a internet después de la primera generación (Chart.js se descarga y cachea en `.chartjs.cache.js`).
 
 ### Introducir un ticket manualmente
+
+Si tienes un ticket en papel o falla la importación automática, se puede introducir a mano en el sistema.
 
 ```bash
 python3 manual.py            # introducir ticket nuevo
