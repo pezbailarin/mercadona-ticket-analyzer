@@ -13,8 +13,6 @@ Mercadona envía un ticket en PDF por cada compra, si se ha registrado la tarjet
 ## Requisitos
 
 - Python 3.9 o superior
-- `pdfplumber`
-- `python-dotenv`
 
 No se necesitan más dependencias externas. El informe HTML funciona directamente en el navegador sin servidor.
 
@@ -167,3 +165,5 @@ python3 stats.py && open informe.html
 ---
 
 ![Ejemplo](images/captura.jpeg)
+
+![Records](images/captura_2.png)

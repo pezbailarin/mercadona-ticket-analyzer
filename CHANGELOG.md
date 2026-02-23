@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.7] - 2026-02-23
+
+### Añadido
+- `retrieve.py` puede leer credenciales de autentificación OAuth de Google, desde un fichero `credentials.json` especificado en `.env`
+
 ## [1.0.5] — 2026-02-22
 
 ### Añadido
